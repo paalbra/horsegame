@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<title>Hestetest</title>
+<!--meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, maximum-scale=1, user-scalable=no"-->
+<style type="text/css">
+*:not(input):not(textarea) {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+* {
+   margin: 0;
+   padding: 0;
+   touch-action: none;
+}
+
+body, html {
+   height: 100%;
+   background: #797676;
+}
+
+#canvas {
+   position: absolute;
+   height: 100%;
+   width: 100%;
+}
+
+#info {
+    position: absolute;
+    top: 1em;
+    left: 1em;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid #000;
+    padding: 1em;
+}
+
+#seconds {
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: #000;
+    font-size: 64px;
+    font-weight: bold;
+    text-stroke: 1px #fff;
+    -webkit-text-stroke: 1px #fff;
+}
+
+/* bg: 797676 */
+
+/* mb: 7494a4, lb: a9b6b2 */
+/* mb: 140,218,248 , lb: 207,240,252 */
+/* mb:      8cdaf8 , lb:      cff0fc */
+
+/* mmb: 83,200,244 - 53c8f4 */
+/* mmb: 47,188,242 - 2fbcf2 */
+
+/* vh: cb9743, hh: d0c19a */
+/* vh: 246,193,82 , hh: 250,242,218 */
+/* vh:     f6c152 , hh:      faf2da */
+
+/* lh: a66432, mh: 56402d */
+/* lh: 176,95,22 mh: 47,22,0 */
+/* lh:    b05f16 mh:   2f160 */
+
+</style>
+<script src="https://code.jquery.com/jquery-3.6.0.slim.min.js" integrity="sha256-u7e5khyithlIdTpu22PHhENmPcRdFiHRjhAuHcs05RI=" crossorigin="anonymous"></script>
+<script>
+var canvas;
+var timer;
+var timerSeconds;
+var moveDirection;
+var waterVector = 0;
+var horseAngle = 0;
+var horseXPosition;
+var horseYPosition;
+var waterIndexWithHorse;
+
+const waterWidth = 50;
+const waterHeight = 20;
+const touchDuration = 10;
+const inputDuration = 10;
+const rainbowColors1 = [
+    "#FF0000",
+    "#FF7F00",
+    "#FFFF00",
+    "#00FF00",
+    "#0000FF",
+    "#4B0082",
+    "#9400D3",
+];
+const rainbowColors2 = [
+    "#FF7F7F",
+    "#FFBD7F",
+    "#FFFF7F",
+    "#7FFF7F",
+    "#7F7FFF",
+    "#633F7F",
+    "#B168D1",
+];
+const waterColors = [
+    "#53c8f4",
+    "#2fbcf2",
+];
+var waterElementCount = Math.round(window.innerHeight / waterHeight);
+var horseScore = 0;
+var seconds = 0;
+var waterElements = [
+    Math.round(window.innerWidth/2),
+];
+
+var emitees = [];
+
+function getRandomColor(colorArray) {
+    return colorArray[Math.floor(Math.random() * colorArray.length)];
+}
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    waterElementCount = Math.round(window.innerHeight / waterHeight);
+    horseXPosition = Math.round(window.innerWidth/2);
+    horseYPosition = canvas.height - Math.round(horseImage.height/2);
+}
+
+function increaseSeconds() {
+    seconds += 1;
+    timerSeconds = setTimeout(increaseSeconds, 1000);
+}
+
+function move() {
+    timer = null;
+    if (moveDirection == "LEFT") {
+        horseXPosition -= 5;
+    } else if (moveDirection == "RIGHT") {
+        horseXPosition += 5;
+    }
+    timer = setTimeout(move, inputDuration);
+}
+
+function moveStart() {
+    if (!timer) {
+        timer = setTimeout(move, inputDuration);
+    }
+}
+
+function moveEnd() {
+    moveDirection = null;
+    if (timer) {
+        clearTimeout(timer);
+        timer = null;
+    }
+}
+
+function keyDown(e) {
+    //e.preventDefault();
+
+    if (e.key == "ArrowLeft") {
+        moveDirection = "LEFT";
+        moveStart();
+    } else if (e.key == "ArrowRight") {
+        moveDirection = "RIGHT";
+        moveStart();
+    }
+}
+
+function keyUp(e) {
+    //e.preventDefault();
+
+    if (e.key == "ArrowLeft" || e.key == "ArrowRight") {
+        moveEnd();
+    }
+}
+
+function touchStart(e) {
+    //e.preventDefault();
+    // Chrome on Android is weird and doesn't have e.pageX og e.pageY
+    let touch_x = e.pageX || e.touches[0].pageX;
+    //let touch_y = e.pageY || e.touches[0].pageY;
+    moveDirection = touch_x < window.innerWidth/2 ? "LEFT" : "RIGHT";
+    moveStart();
+}
+
+function touchEnd(e) {
+    //e.preventDefault();
+    moveEnd();
+}
+
+
+window.onload = function() {
+    horseImageMint = document.getElementById("hest_mint");
+    horseImageClean = document.getElementById("hest_clean");
+    horseImageUnclean = document.getElementById("hest_unclean");
+    horseImageDirty = document.getElementById("hest_dirty");
+    horseImageVerydirty = document.getElementById("hest_verydirty");
+
+    horseImage = horseImageVerydirty;
+
+    // Add touch listeners
+    window.addEventListener("touchstart", touchStart, false);
+    window.addEventListener("touchend", touchEnd, false);
+    window.addEventListener("mousedown", touchStart, false);
+    window.addEventListener("mouseup", touchEnd, false);
+    window.addEventListener("keydown", keyDown, false);
+    window.addEventListener("keyup", keyUp, false);
+
+    // Add resize listener, in case of window resize
+    window.addEventListener("resize", resizeCanvas, false);
+
+    canvas = document.getElementById("canvas");
+    const context = canvas.getContext("2d");
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    horseXPosition = Math.round(window.innerWidth/2);
+    horseYPosition = canvas.height - Math.round(horseImage.height/2);
+
+    function animate(timestamp) {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw touch indicator
+        if (moveDirection == "LEFT") {
+            var gradient = context.createLinearGradient(0, 0, canvas.width/2, 0);
+            gradient.addColorStop(0, "rgba(255, 255, 255, 0.2)");
+            gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, canvas.width/2, canvas.height);
+        } else if (moveDirection == "RIGHT") {
+            var gradient = context.createLinearGradient(canvas.width/2, 0, canvas.width, 0);
+            gradient.addColorStop(0, "rgba(255, 255, 255, 0)");
+            gradient.addColorStop(1, "rgba(255, 255, 255, 0.2)");
+            context.fillStyle = gradient;
+            context.fillRect(canvas.width/2, 0, canvas.width, canvas.height);
+        }
+
+        if (horseScore > 100) {
+            // Draw random water/bubble circle
+            let x = Math.random() * canvas.width;
+            let y = Math.random() * canvas.height;
+            let radius = 10 + Math.random() * 15;
+            context.beginPath();
+            context.arc(x, y, radius, 0, Math.PI*2);
+            context.fillStyle = getRandomColor(waterColors);
+            context.fill();
+        }
+
+        waterIndexWithHorse = Math.round((canvas.height - horseImage.height/2) / waterHeight);
+
+        // Draw all water loop
+        let loopCount = 0;
+        for (let index in waterElements) {
+            let value = waterElements[index];
+
+            if (horseScore > 500 && seconds >= 20) {
+                for (let index in rainbowColors2) {
+                    context.beginPath();
+                    context.fillStyle = rainbowColors2[index];
+                    context.rect(value - Math.floor(waterWidth/2) + Math.floor(index*waterWidth/rainbowColors2.length), loopCount, Math.floor(waterWidth/rainbowColors2.length), waterHeight);
+                    context.fill();
+                }
+            } else {
+                // Outer water
+                context.beginPath();
+                context.fillStyle = "#8cdaf8";
+                context.rect(value - Math.floor(waterWidth/2), loopCount, waterWidth, waterHeight);
+                context.fill();
+
+                // Inner water
+                context.beginPath();
+                context.fillStyle = "#cff0fc";
+                if (index == waterIndexWithHorse) {
+                    // Last element
+                    //context.fillStyle = "#7777FF";
+                }
+                context.rect(value - Math.floor(waterWidth/2) + Math.floor(waterWidth/3), loopCount,  Math.floor(waterWidth/3), waterHeight);
+                context.fill();
+            }
+
+            loopCount += waterHeight;
+        }
+
+        let horseCenterX = horseXPosition;
+        let horseCenterY = canvas.height - Math.round(horseImage.height/2);
+
+        // Draw horse
+        if (horseScore > 500 && seconds >= 20) {
+            horseImage = horseImageMint;
+        } else if (horseScore > 300) {
+            horseImage = horseImageClean;
+        } else if (horseScore > 200) {
+            horseImage = horseImageUnclean;
+        } else if (horseScore > 100) {
+            horseImage = horseImageDirty;
+        } else {
+            horseImage = horseImageVerydirty;
+        }
+        context.drawImage(horseImage, horseXPosition - horseImage.width/2, canvas.height - horseImage.height);
+
+        // "The horse is in the water" logic
+        if (waterElements.length - 1 >= waterIndexWithHorse) {
+            // The water has fallen to the horse
+
+            // Horse distance to water
+            let waterDistance = Math.abs(waterElements[waterIndexWithHorse] - horseXPosition);
+            if (waterDistance < waterWidth*1.5) {
+                // Yup, it's in the water
+
+                if (!timerSeconds) {
+                    timerSeconds = setTimeout(increaseSeconds, 1000);
+                }
+
+                // Horse score?
+                horseScore = horseScore + 1;
+
+                // Draw blue ish circle around horse
+                context.beginPath();
+                context.arc(horseXPosition, horseYPosition, horseImage.height/3, 0, Math.PI*2);
+                context.fillStyle = "rgba(47, 188, 242, 0.1)";
+                context.fill();
+
+                // Add emitee
+                emitees.unshift(1);
+            } else {
+                if (timerSeconds) {
+                    document.getElementById("seconds").innerText = "";
+                    clearTimeout(timerSeconds);
+                    timerSeconds = null;
+                    seconds = 0;
+                }
+                horseScore = horseScore - 5;
+            }
+
+            if (horseScore < -100) {
+                // Let's pretend you aren't that shitty at horsing around
+                horseScore = -100;
+            }
+        }
+
+        // Draw all emitees
+        for (let index in emitees) {
+            let xrand = Math.floor(Math.random() * horseImage.width) - horseImage.width/2;
+            let yrand = Math.floor(Math.random() * horseImage.height) - horseImage.height/2;
+            let x = horseXPosition + xrand;
+            let y = horseYPosition + yrand;
+            let radius = 5 + Math.random() * 15;
+            context.beginPath();
+            context.arc(x, y, radius, 0, Math.PI*2);
+            context.fillStyle = "rgba(255, 255, 255, 0.9)";
+            context.fill();
+        }
+
+        // Calculate new water position
+        let oldWater = waterElements[0];
+        if (waterVector != 0 & Math.floor(Math.random() * 15) != 0) {
+            // Keep current vector, at a probability
+            newVector = waterVector;
+        } else {
+            // Generate new random vector
+            newVector = 1 - Math.floor(Math.random() * 3);
+            if (horseScore > 300) {
+                newVector *= 2.5;
+            } else if (horseScore > 200) {
+                newVector *= 2;
+            } else if (horseScore > 100) {
+                newVector *= 1.5;
+            }
+        }
+        // Simple workaround for edges
+        if (oldWater < 20) {
+            newVector = 1;
+        } else if (oldWater > canvas.width-20) {
+            newVector = -1;
+        }
+        waterVector = newVector;
+        newWater = oldWater + waterVector*2;
+        waterElements.unshift(newWater);
+
+        // Maintain max water amount
+        if (waterElements.length > waterElementCount) {
+            waterElements.pop();
+        }
+
+        // Always try to pop the oldest emitee
+        emitees.pop();
+
+        // TODO. What is this?
+        if (seconds > 0) {
+            document.getElementById("seconds").style.top = `${horseYPosition - horseImage.height}px`;
+            secondsX = horseXPosition;
+            if (secondsX < 100) {
+                secondsX = 100;
+            } else if (secondsX > canvas.width-100) {
+                secondsX = canvas.width-100;
+            }
+            document.getElementById("seconds").style.left = `${secondsX}px`;
+            document.getElementById("seconds").innerText = seconds;
+        }
+        
+
+        // Add some horse score
+        context.beginPath();
+        context.fillStyle = "rgba(0, 255, 0, 0.5)";
+        context.rect(canvas.width - 40, canvas.height - Math.min(horseScore, canvas.height), 20, canvas.height);
+        context.fill();
+
+        window.requestAnimationFrame(animate);
+    }
+
+    window.requestAnimationFrame(animate);
+};
+</script>
+</head>
+
+<body>
+
+<img id="hest_mint" style="display: none" src="hest100_mint.png">
+<img id="hest_clean" style="display: none" src="hest100_clean.png">
+<img id="hest_unclean" style="display: none" src="hest100_unclean.png">
+<img id="hest_dirty" style="display: none" src="hest100_dirty.png">
+<img id="hest_verydirty" style="display: none" src="hest100_verydirty.png">
+
+<canvas id="canvas" width="100%" height="100%"></canvas>
+
+<div id="info">
+<h1>Hest er best!</h1>
+</div>
+
+<p id="seconds" style="position: absolute; top: 0px; left: 0px;"></p>
+
+</body>
+
+</html>
